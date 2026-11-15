@@ -9,8 +9,8 @@ def findedges(image, sigma, theta):
     width = len(Imag[0])
     edges = np.zeros((height, width)) # Create a black image.
 
-    for row in range(height):
-        for col in range(width):
+    for row in range(height): # check every image row
+        for col in range(width): # check every pixel in the row
             if Imag[row, col] >= theta:
                 edges[row, col] = Imag[row, col]
 
@@ -30,10 +30,10 @@ def nonmax_suppression(magnitude, direction):
         (1, -1),  # 135 degrees: down-left
     ]
 
-    for row in range(1, height - 1):
+    for row in range(1, height - 1): # skip the image border
         for col in range(1, width - 1):
             angle = direction[row, col]
-            direction_bin = round(angle / (np.pi / 4)) % 4
+            direction_bin = round(angle / (np.pi / 4)) % 4 # nearest direction
             row_step, col_step = steps[direction_bin]
 
             current = magnitude[row, col]
@@ -50,19 +50,17 @@ def hysteresis(thinned, t_low, t_high):
     height = len(thinned)
     width = len(thinned[0])
     edges = np.zeros((height, width), dtype=bool)
-    pending = []
+    pending = [] # strong pixels waiting to be checked
 
-    # 강한 픽셀을 표시하고, 이웃을 확인할 목록에 넣는다.
-    for row in range(height):
+    for row in range(height): # find starting strong edges
         for col in range(width):
             if thinned[row, col] >= t_high:
                 edges[row, col] = True
                 pending.append((row, col))
 
-    # 새로 찾은 약한 픽셀에서도 계속 이웃을 따라간다.
-    while pending:
+    while pending: # continue through connected weak edges
         row, col = pending.pop()
-        for y in range(max(0, row - 1), min(height, row + 2)):
+        for y in range(max(0, row - 1), min(height, row + 2)): # 3x3 neighborhood
             for x in range(max(0, col - 1), min(width, col + 2)):
                 if edges[y, x]:
                     continue
@@ -85,7 +83,7 @@ def show_results():
     height = len(thinned)
     width = len(thinned[0])
     thinned_thresholded = np.zeros((height, width))
-    for row in range(height):
+    for row in range(height): # threshold the thinned result for display
         for col in range(width):
             if thinned[row, col] >= high:
                 thinned_thresholded[row, col] = thinned[row, col]
