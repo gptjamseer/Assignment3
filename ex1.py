@@ -53,6 +53,7 @@ def partial_derivatives2(image, sigma):
     Ixx, Ixy = partial_derivatives(Ix, sigma)
     Iyx, Iyy = partial_derivatives(Iy, sigma)
     return Ixx, Ixy, Iyy
+
 # (d)
 def gradient_magnitude(image, sigma):
     Ix, Iy = partial_derivatives(image, sigma)
@@ -144,6 +145,3 @@ def e(n_bins=8, target_name="object_05_4.png"):
         labels.append(f"{image_paths[index].name}\nL2: {distance:.3f}")
 
     show_images_and_histograms(images, histograms, labels)
-
-if __name__ == "__main__":
-    e()

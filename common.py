@@ -1,4 +1,5 @@
 from pathlib import Path
+from a3_utils import draw_line
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,33 +12,17 @@ def load_rgb_image(path):
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     return image.astype(np.float64) / 255.0
 
-def to_grayscale_average(image):
-    float_image = image.astype(np.float64)
-    red = float_image[:, :, 0]
-    green = float_image[:, :, 1]
-    blue = float_image[:, :, 2]
-    return (red + green + blue) / 3
-
 def load_gray(path):
     image = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
     return image.astype(np.float64) / 255.0 # compute a normalized histogram of grayscale.
 
-def myhist(image, n_bins):
-    histogram = np.zeros(n_bins)
-    pixels = image.reshape(-1)
-    for value in pixels:
-        bin_index = int(value * n_bins)
-        if bin_index == n_bins:
-            bin_index = n_bins - 1
-        histogram[bin_index] += 1
-    return histogram / np.sum(histogram)
-
-def show_images(images, title):
-    plt.figure()
+def show_images(images, title="", figsize=None, cmap="gray", interpolation=None):
+    figure = plt.figure(figsize=figsize)
     plt.suptitle(title)
     for i in range(len(images)):
         plt.subplot(1, len(images), i + 1)
-        plt.imshow(images[i], cmap="gray")
+        plt.imshow(images[i], cmap=cmap, interpolation=interpolation)
+    return figure
 
 # ex1 (c)
 def show_images_in_subplots(images, rows, columns):
@@ -68,42 +53,24 @@ def show_images_and_histograms(images, histograms, labels):
     plt.tight_layout()
     plt.show()
 
-def show_signals(signals, title):
-    plt.figure()
-
-    for label, signal in signals.items():
-        positions, values = signal
-        plt.plot(positions, values, label=label)
-
-    plt.title(title)
-    plt.legend()
-    plt.tight_layout()
+def show_figure(figure, caption="", margin=0, caption_y=0.05):
+    figure.tight_layout(rect=(0, margin, 1, 1))
+    if caption:
+        figure.text(0.5, caption_y, caption, ha="center", fontfamily="serif")
     plt.show()
 
-def show_signals_in_subplots(signals, rows, columns, ylim=None):
-    plt.figure(figsize=(3 * columns, 3 * rows))
-    for i, (label, signal) in enumerate(signals.items(), start=1):
-        if signal is None:
-            continue
-        plt.subplot(rows, columns, i)
-        plt.plot(signal)
-        plt.title(label)
-        if ylim is not None:
-            plt.ylim(*ylim)
-    plt.tight_layout()
-    plt.show()
 
-# ex3 (e)
-def show_signals_best5(signals, rows, columns):
-    plt.figure()
+def plot_hough_lines(axis, shape, rhos, thetas, peaks, color="red", linewidth=0.5):
+    plt.sca(axis)
+    for row, col in peaks:
+        draw_line(rhos[row], thetas[col], *shape[:2], clr=color, linewidth=linewidth)
 
-    for i, (label, signal) in enumerate(signals.items(), start=1):
-        best5 = np.argsort(signal)[:5]
 
-        plt.subplot(rows, columns, i)
-        plt.plot(signal)
-        plt.plot(best5, signal[best5], "ro", fillstyle="none")
-        plt.title(label)
-
-    plt.tight_layout()
-    plt.show()
+def plot_hough_column(axes, title, image, votes, rhos, thetas, peaks, theta_step=100):
+    top, bottom = axes
+    top.imshow(votes, cmap="viridis")
+    top.set_title(title)
+    top.set_xticks(range(0, len(thetas), theta_step))
+    top.set_yticks(range(0, len(rhos), 100))
+    bottom.imshow(image, cmap="gray")
+    plot_hough_lines(bottom, image.shape, rhos, thetas, peaks, linewidth=1)

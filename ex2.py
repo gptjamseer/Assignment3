@@ -1,73 +1,104 @@
 from common import IMAGES, load_gray, show_images_in_subplots
 from ex1 import gradient_magnitude
 import numpy as np
-import cv2
 
 # (a)
 def findedges(image, sigma, theta):
-    """Keep gradient magnitudes at or above theta in a grayscale image."""
-    magnitude, _ = gradient_magnitude(np.asarray(image, dtype=float), sigma)
-    return np.where(magnitude >= theta, magnitude, 0)
+    Imag, _ = gradient_magnitude(image, sigma)
+    height = len(Imag)
+    width = len(Imag[0])
+    edges = np.zeros((height, width)) # Create a black image.
 
-def a():
-    image = load_gray(IMAGES / "museum.jpg")
-    images = {"Original": image}
-    for theta in (0.04, 0.08, 0.16):
-        images[f"Threshold = {theta}"] = findedges(image, 1, theta)
-    show_images_in_subplots(images, 2, 2)
+    for row in range(height):
+        for col in range(width):
+            if Imag[row, col] >= theta:
+                edges[row, col] = Imag[row, col]
+
+    return edges
 
 # (b)
 def nonmax_suppression(magnitude, direction):
-    """Keep local peaks along the nearest of four gradient orientations."""
-    center = magnitude[1:-1, 1:-1]
-    bins = np.floor(direction[1:-1, 1:-1] / (np.pi / 4) + 0.5) % 4
-    # Positive y points down the image, so 45 degrees runs NW to SE.
-    neighbors = (
-        (magnitude[1:-1, :-2], magnitude[1:-1, 2:]),
-        (magnitude[:-2, :-2], magnitude[2:, 2:]),
-        (magnitude[:-2, 1:-1], magnitude[2:, 1:-1]),
-        (magnitude[:-2, 2:], magnitude[2:, :-2]),
-    )
-    keep = np.zeros(center.shape, dtype=bool)
-    for orientation, (before, after) in enumerate(neighbors):
-        # Break ties on one side to thin equal-height ridges.
-        keep |= (bins == orientation) & (center > before) & (center >= after)
-    result = np.zeros_like(magnitude)
-    result[1:-1, 1:-1] = np.where(keep, center, 0)
-    return result
+    height = len(magnitude)
+    width = len(magnitude[0])
+    thinned = np.zeros((height, width)) # Create a black image.
 
-def b():
-    image = load_gray(IMAGES / "museum.jpg")
-    magnitude, direction = gradient_magnitude(image, 1)
-    thinned = nonmax_suppression(magnitude, direction)
-    theta = 0.16
-    show_images_in_subplots({
-        "Original": image,
-        f"Threshold = {theta}": np.where(magnitude >= theta, magnitude, 0),
-        f"Nonmax, threshold = {theta}": np.where(thinned >= theta, thinned, 0),
-    }, 1, 3)
+    # (row, col) step along each gradient direction
+    steps = [
+        (0, 1),   # 0 degrees: right
+        (1, 1),   # 45 degrees: down-right
+        (1, 0),   # 90 degrees: down
+        (1, -1),  # 135 degrees: down-left
+    ]
+
+    for row in range(1, height - 1):
+        for col in range(1, width - 1):
+            angle = direction[row, col]
+            direction_bin = round(angle / (np.pi / 4)) % 4
+            row_step, col_step = steps[direction_bin]
+
+            current = magnitude[row, col]
+            before = magnitude[row - row_step, col - col_step]
+            after = magnitude[row + row_step, col + col_step]
+            # Use a strict comparison on one side to thin equal peaks.
+            if current > before and current >= after:
+                thinned[row, col] = current
+
+    return thinned
 
 # (c)
 def hysteresis(thinned, t_low, t_high):
-    """Return the 8-connected edge components containing a strong pixel."""
-    if not 0 <= t_low < t_high:
-        raise ValueError("Expected 0 <= t_low < t_high")
-    candidates = (thinned > 0) & (thinned >= t_low)
-    count, labels = cv2.connectedComponents(candidates.astype(np.uint8), connectivity=8)
-    keep = np.zeros(count, dtype=bool)
-    keep[labels[thinned >= t_high]] = True
-    return keep[labels]
+    height = len(thinned)
+    width = len(thinned[0])
+    edges = np.zeros((height, width), dtype=bool)
+    pending = []
 
-def c():
+    # 강한 픽셀을 표시하고, 이웃을 확인할 목록에 넣는다.
+    for row in range(height):
+        for col in range(width):
+            if thinned[row, col] >= t_high:
+                edges[row, col] = True
+                pending.append((row, col))
+
+    # 새로 찾은 약한 픽셀에서도 계속 이웃을 따라간다.
+    while pending:
+        row, col = pending.pop()
+        for y in range(max(0, row - 1), min(height, row + 2)):
+            for x in range(max(0, col - 1), min(width, col + 2)):
+                if edges[y, x]:
+                    continue
+                value = thinned[y, x]
+                if value > 0 and value >= t_low:
+                    edges[y, x] = True
+                    pending.append((y, x))
+
+    return edges
+
+def show_results():
     image = load_gray(IMAGES / "museum.jpg")
-    magnitude, direction = gradient_magnitude(image, 1)
-    thinned = nonmax_suppression(magnitude, direction)
-    images = {"Original": image}
-    for low, high in ((0.04, 0.16), (0.08, 0.16), (0.04, 0.24)):
-        images[f"Hysteresis, low={low}, high={high}"] = hysteresis(thinned, low, high)
+    sigma = 1
+    low = 0.04
+    high = 0.16
+
+    thresholded = findedges(image, sigma, high)
+    Imag, Idir = gradient_magnitude(image, sigma)
+    thinned = nonmax_suppression(Imag, Idir)
+    height = len(thinned)
+    width = len(thinned[0])
+    thinned_thresholded = np.zeros((height, width))
+    for row in range(height):
+        for col in range(width):
+            if thinned[row, col] >= high:
+                thinned_thresholded[row, col] = thinned[row, col]
+
+    edges = hysteresis(thinned, low, high)
+
+    images = {
+        "Original": image,
+        f"Thresholded (thr = {high})": thresholded,
+        f"Nonmax. supp. (thr = {high})": thinned_thresholded,
+        f"Hysteresis (high = {high}, low = {low})": edges,
+    }
     show_images_in_subplots(images, 2, 2)
 
-
 if __name__ == "__main__":
-    c()
-
+    show_results()
